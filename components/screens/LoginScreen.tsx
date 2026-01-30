@@ -44,8 +44,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigate }) => {
                     <form className="space-y-6" onSubmit={handleSubmit}>
                         {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-[10px] font-black uppercase text-center">{error}</div>}
                         <div className="space-y-4">
-                            <Input label="Secure ID" id="qa_username" placeholder="USER_0000" value={username} onChange={e => setUsername(e.target.value)} required />
-                            <Input label="Access Code" id="qa_password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+                            <Input label="Secure ID" id="username" placeholder="USER_0000" value={username} onChange={e => setUsername(e.target.value)} required />
+                            <Input label="Access Code" id="password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
                         </div>
                         <Button type="submit" fullWidth disabled={loading} className="py-4 text-base font-black tracking-tight">
                             {loading ? 'Authorizing...' : 'Enter Vault Access'}
