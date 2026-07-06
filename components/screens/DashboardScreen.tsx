@@ -117,6 +117,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onNavigate }) =
                     <section className="bg-slate-900/40 border border-white/5 rounded-[2.5rem] p-8 shadow-xl">
                         <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-8">Asset Management</h4>
                         <div className="space-y-4">
+                                    <QuickLink label="Document Library" icon="📚" onClick={() => onNavigate({name: 'documentLibrary'})} />
                            <QuickLink label="Request Lending" icon="🏛️" onClick={() => onNavigate({name: 'loans'})} />
                            <QuickLink 
                                 label="Freeze All Cards" 

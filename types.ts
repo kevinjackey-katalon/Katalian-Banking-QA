@@ -41,6 +41,7 @@ export type ViewType =
   | { name: 'login' }
   | { name: 'resetPassword' }
   | { name: 'dashboard' }
+  | { name: 'documentLibrary' }
   | { name: 'transfer' }
   | { name: 'deposit' }
   | { name: 'loans' }

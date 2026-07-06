@@ -14,6 +14,7 @@ import ContactScreen from './components/screens/ContactScreen';
 import SecurityScreen from './components/screens/SecurityScreen';
 import DepositScreen from './components/screens/DepositScreen';
 import AccountDetailsScreen from './components/screens/AccountDetailsScreen';
+import DocumentLibraryScreen from './components/screens/DocumentLibraryScreen';
 import AdminScreen from './components/screens/AdminScreen';
 import Header from './components/common/Header';
 import AiAssistant from './components/common/AiAssistant';
@@ -122,6 +123,7 @@ const App: React.FC = () => {
         switch (view.name) {
             case 'login': navigate('/login'); break;
             case 'dashboard': navigate('/dashboard'); break;
+            case 'documentLibrary': navigate('/document-library'); break;
             case 'transfer': navigate('/transfer'); break;
             case 'deposit': navigate('/deposit'); break;
             case 'resetPassword': navigate('/reset-password'); break;
@@ -238,6 +240,7 @@ const App: React.FC = () => {
                     
                     <Route element={<ProtectedRoute user={currentUser} />}>
                         <Route path="/dashboard" element={currentUser && <DashboardScreen user={currentUser} onNavigate={handleNavigate} />} />
+                        <Route path="/document-library" element={<DocumentLibraryScreen onNavigate={handleNavigate} />} />
                         <Route path="/account/:accountId" element={currentUser && <AccountDetailsWrapper user={currentUser} />} />
                         <Route path="/transfer" element={currentUser && <TransferScreen user={currentUser} onTransfer={handleTransfer} onNavigate={handleNavigate} />} />
                         <Route path="/deposit" element={currentUser && <DepositScreen user={currentUser} onNavigate={handleNavigate} onDeposit={handleDeposit} />} />
