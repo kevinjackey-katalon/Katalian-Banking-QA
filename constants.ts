@@ -118,5 +118,4 @@ export const LOAN_PRODUCTS = [
     { type: 'Mortgage', rate: '6.45%', description: 'Your journey to home ownership starts here.', icon: '🏠' },
 ];
 
-export const ID_TYPES: LoanApplicationIdType[] = ['Passport', 'Driver License', 'National ID'];
-export type LoanApplicationIdType = 'Passport' | 'Driver License' | 'National ID';
+export const ID_TYPES: Array<'Passport' | 'Driver License' | 'National ID'> = ['Passport', 'Driver License', 'National ID'];
