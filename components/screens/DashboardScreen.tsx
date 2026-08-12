@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { User, ViewType, Account } from '../../types';
 import Button from '../common/Button';
@@ -10,6 +9,7 @@ interface DashboardScreenProps {
 
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onNavigate }) => {
     const totalBalance = user.accounts.reduce((sum, acc) => sum + acc.balance, 0);
+    const pendingDisbursementLoans = (user.loans || []).filter(l => l.decision === 'Approved' && !l.disbursed);
 
     const applicationOptions: { label: string; type: Account['type']; icon: string; requiresPlatinum: boolean }[] = [
         { label: 'Checking', type: 'Checking', icon: '💳', requiresPlatinum: false },
@@ -43,6 +43,20 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onNavigate }) =
                     </div>
                 </div>
             </div>
+
+            {pendingDisbursementLoans.length > 0 && (
+                <div id="pending_disbursement_banner" className="bg-emerald-500/10 border border-emerald-500/20 rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-1">Action Required</p>
+                        <p className="text-sm font-bold text-white">
+                            You have {pendingDisbursementLoans.length} approved loan{pendingDisbursementLoans.length > 1 ? 's' : ''} awaiting fund disbursement.
+                        </p>
+                    </div>
+                    <Button onClick={() => onNavigate({ name: 'disbursement', loanId: pendingDisbursementLoans[0].id })} className="!rounded-full px-8 shrink-0">
+                        Disburse Now →
+                    </Button>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                 {/* Account List */}
@@ -118,6 +132,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onNavigate }) =
                         <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-8">Asset Management</h4>
                         <div className="space-y-4">
                                     <QuickLink label="Document Library" icon="📚" onClick={() => onNavigate({name: 'documentLibrary'})} />
+                           <QuickLink label="Manage Payees" icon="👥" onClick={() => onNavigate({name: 'payees'})} />
                            <QuickLink label="Request Lending" icon="🏛️" onClick={() => onNavigate({name: 'loans'})} />
                            <QuickLink 
                                 label="Freeze All Cards" 
