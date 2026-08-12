@@ -1,15 +1,18 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate, Outlet, useParams } from 'react-router-dom';
-import { User, Account, ApplicationData, Loan, LoanApplicationData, ViewType } from './types';
+import { User, Account, ApplicationData, Loan, LoanApplicationData, ViewType, Payee, Transaction } from './types';
 import { USERS } from './constants';
 import LoginScreen from './components/screens/LoginScreen';
+import TwoFactorScreen from './components/screens/TwoFactorScreen';
 import DashboardScreen from './components/screens/DashboardScreen';
 import PasswordResetScreen from './components/screens/PasswordResetScreen';
 import TransferScreen from './components/screens/TransferScreen';
+import PayeesScreen from './components/screens/PayeesScreen';
 import ApplicationScreen from './components/screens/ApplicationScreen';
 import LoanApplicationScreen from './components/screens/LoanApplicationScreen';
 import LoansScreen from './components/screens/LoansScreen';
+import CreditDecisionScreen from './components/screens/CreditDecisionScreen';
+import DisbursementScreen from './components/screens/DisbursementScreen';
 import ContactScreen from './components/screens/ContactScreen';
 import SecurityScreen from './components/screens/SecurityScreen';
 import DepositScreen from './components/screens/DepositScreen';
@@ -19,6 +22,7 @@ import AdminScreen from './components/screens/AdminScreen';
 import Header from './components/common/Header';
 import AiAssistant from './components/common/AiAssistant';
 import { mockApi } from './api/mockApi';
+import { isDeviceTrusted } from './utils/otp';
 
 const STORAGE_KEYS = {
     USERS: 'katalian_users_v1',
@@ -92,6 +96,41 @@ const AccountDetailsWrapper: React.FC<{ user: User }> = ({ user }) => {
     />;
 }
 
+const CreditDecisionWrapper: React.FC<{ user: User }> = ({ user }) => {
+    const { loanId } = useParams<{ loanId: string }>();
+    const navigate = useNavigate();
+    const loan = user.loans.find(l => l.id === loanId);
+    if (!loan) return <Navigate to="/loans" replace />;
+
+    return <CreditDecisionScreen
+        loan={loan}
+        onNavigate={(view) => {
+            if (view.name === 'dashboard') navigate('/dashboard');
+            if (view.name === 'contact') navigate('/contact');
+            if (view.name === 'disbursement') navigate(`/disburse/${view.loanId}`);
+        }}
+    />;
+}
+
+const DisbursementWrapper: React.FC<{
+    user: User,
+    onDisburse: (loanId: string, toAccountId: string) => Promise<void>
+}> = ({ user, onDisburse }) => {
+    const { loanId } = useParams<{ loanId: string }>();
+    const navigate = useNavigate();
+    const loan = user.loans.find(l => l.id === loanId);
+    if (!loan || loan.decision !== 'Approved') return <Navigate to="/dashboard" replace />;
+
+    return <DisbursementScreen
+        loan={loan}
+        user={user}
+        onDisburse={onDisburse}
+        onNavigate={(view) => {
+            if (view.name === 'dashboard') navigate('/dashboard');
+        }}
+    />;
+}
+
 const App: React.FC = () => {
     // Initialize state from localStorage
     const [users, setUsers] = useState<User[]>(() => {
@@ -102,6 +141,8 @@ const App: React.FC = () => {
         const saved = localStorage.getItem(STORAGE_KEYS.SESSION);
         return saved ? JSON.parse(saved) : null;
     });
+    // A user who has passed password authentication but has not yet completed the 2FA challenge.
+    const [pendingUser, setPendingUser] = useState<User | null>(null);
     
     const navigate = useNavigate();
 
@@ -122,10 +163,12 @@ const App: React.FC = () => {
     const handleNavigate = useCallback((view: ViewType) => {
         switch (view.name) {
             case 'login': navigate('/login'); break;
+            case 'verifyOtp': navigate('/verify-otp'); break;
             case 'dashboard': navigate('/dashboard'); break;
             case 'documentLibrary': navigate('/document-library'); break;
             case 'transfer': navigate('/transfer'); break;
             case 'deposit': navigate('/deposit'); break;
+            case 'payees': navigate('/payees'); break;
             case 'resetPassword': navigate('/reset-password'); break;
             case 'contact': navigate('/contact'); break;
             case 'loans': navigate('/loans'); break;
@@ -133,22 +176,43 @@ const App: React.FC = () => {
             case 'security': navigate(`/security/${view.action}`); break;
             case 'apply': navigate(`/apply/${encodeURIComponent(view.for)}`); break;
             case 'applyLoan': navigate(`/apply-loan/${encodeURIComponent(view.loanType)}`); break;
+            case 'creditDecision': navigate(`/loan-decision/${view.loanId}`); break;
+            case 'disbursement': navigate(`/disburse/${view.loanId}`); break;
         }
     }, [navigate]);
 
-    const handleLogin = (username: string, password: string):'success' | 'locked' | 'invalid' => {
+    const handleLogin = (username: string, password: string): 'success' | 'locked' | 'invalid' => {
         const user = users.find(u => u.username === username);
         if (!user) return 'invalid';
         if (user.locked) return 'locked';
         if (user.passwordHash !== password) return 'invalid';
 
-        setCurrentUser(user);
-        navigate('/dashboard');
+        if (isDeviceTrusted(user.id)) {
+            // Device previously completed 2FA and was marked as trusted — skip the OTP challenge.
+            setCurrentUser(user);
+            navigate('/dashboard');
+        } else {
+            setPendingUser(user);
+            navigate('/verify-otp');
+        }
         return 'success';
     };
 
+    const handleOtpVerified = useCallback((_rememberDevice: boolean) => {
+        if (!pendingUser) return;
+        setCurrentUser(pendingUser);
+        setPendingUser(null);
+        navigate('/dashboard');
+    }, [pendingUser, navigate]);
+
+    const handleOtpCancel = useCallback(() => {
+        setPendingUser(null);
+        navigate('/login');
+    }, [navigate]);
+
     const handleLogout = useCallback(() => {
         setCurrentUser(null);
+        setPendingUser(null);
         navigate('/login');
     }, [navigate]);
 
@@ -181,13 +245,44 @@ const App: React.FC = () => {
         navigate('/dashboard');
     };
 
+    // Lending: application -> eKYC (validated in the wizard) -> credit decision -> disbursement
     const handleLoanSubmit = async (loanData: LoanApplicationData, type: Loan['type']) => {
         if (!currentUser) return;
         const newLoan = await mockApi.submitLoanApplication(currentUser.id, loanData, type);
         const updatedUser = { ...currentUser, loans: [...(currentUser.loans || []), newLoan] };
         setCurrentUser(updatedUser);
         setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
-        navigate('/dashboard');
+        navigate(`/loan-decision/${newLoan.id}`);
+    };
+
+    const handleDisburseLoan = async (loanId: string, toAccountId: string) => {
+        if (!currentUser) return;
+        const result = await mockApi.disburseLoan(loanId, toAccountId);
+        const loan = currentUser.loans.find(l => l.id === loanId);
+        if (!loan) return;
+
+        const disbursementTx: Transaction = {
+            id: `tx-${Math.random().toString(36).substr(2, 9)}`,
+            date: result.disbursedDate,
+            description: `${loan.type} Loan Disbursement`,
+            amount: loan.amount,
+            type: 'Credit',
+            category: 'Loan Disbursement',
+        };
+
+        const updatedAccounts = currentUser.accounts.map(acc =>
+            acc.id === toAccountId
+                ? { ...acc, balance: acc.balance + loan.amount, transactions: [disbursementTx, ...acc.transactions] }
+                : acc
+        );
+        const updatedLoans = currentUser.loans.map(l =>
+            l.id === loanId
+                ? { ...l, status: 'Active' as const, disbursed: true, disbursedToAccountId: toAccountId, disbursedDate: result.disbursedDate }
+                : l
+        );
+        const updatedUser = { ...currentUser, accounts: updatedAccounts, loans: updatedLoans };
+        setCurrentUser(updatedUser);
+        setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
     };
 
     const handleTransfer = async (fromAccountId: string, toAccountId: string, amount: number) => {
@@ -219,6 +314,50 @@ const App: React.FC = () => {
         navigate('/dashboard');
     };
 
+    const handlePayeeTransfer = async (fromAccountId: string, payeeId: string, amount: number) => {
+        if (!currentUser) return;
+        await mockApi.executeExternalTransfer(fromAccountId, payeeId, amount);
+
+        const payee = currentUser.payees.find(p => p.id === payeeId);
+        if (!payee) return;
+
+        const debitTx: Transaction = {
+            id: `tx-${Math.random().toString(36).substr(2, 9)}`,
+            date: new Date().toISOString(),
+            description: `Payment to ${payee.name}`,
+            amount,
+            type: 'Debit',
+            category: 'Payee Payment',
+        };
+
+        const updatedAccounts = currentUser.accounts.map(acc =>
+            acc.id === fromAccountId
+                ? { ...acc, balance: acc.balance - amount, transactions: [debitTx, ...acc.transactions] }
+                : acc
+        );
+
+        const updatedUser = { ...currentUser, accounts: updatedAccounts };
+        setCurrentUser(updatedUser);
+        setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
+        navigate('/dashboard');
+    };
+
+    const handleAddPayee = async (payeeData: Omit<Payee, 'id' | 'addedDate'>) => {
+        if (!currentUser) return;
+        const newPayee = await mockApi.addPayee(payeeData);
+        const updatedUser = { ...currentUser, payees: [...(currentUser.payees || []), newPayee] };
+        setCurrentUser(updatedUser);
+        setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
+    };
+
+    const handleDeletePayee = async (payeeId: string) => {
+        if (!currentUser) return;
+        await mockApi.deletePayee(payeeId);
+        const updatedUser = { ...currentUser, payees: currentUser.payees.filter(p => p.id !== payeeId) };
+        setCurrentUser(updatedUser);
+        setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
+    };
+
     const handleDeposit = async (toAccountId: string, amount: number) => {
         if (!currentUser) return;
         await mockApi.executeDeposit(toAccountId, amount);
@@ -235,16 +374,24 @@ const App: React.FC = () => {
             <Header user={currentUser} onLogout={handleLogout} onNavigate={handleNavigate} />
             <main className="px-6 py-12 md:py-20 max-w-7xl mx-auto">
                 <Routes>
-                    <Route path="/login" element={<LoginScreen onLogin={handleLogin} onNavigate={handleNavigate} />} />
+                    <Route path="/login" element={currentUser ? <Navigate to="/dashboard" replace /> : <LoginScreen onLogin={handleLogin} onNavigate={handleNavigate} />} />
+                    <Route path="/verify-otp" element={
+                        currentUser ? <Navigate to="/dashboard" replace /> :
+                        pendingUser ? <TwoFactorScreen userId={pendingUser.id} username={pendingUser.username} onVerified={handleOtpVerified} onCancel={handleOtpCancel} /> :
+                        <Navigate to="/login" replace />
+                    } />
                     <Route path="/reset-password" element={<PasswordResetScreen onNavigate={handleNavigate} />} />
                     
                     <Route element={<ProtectedRoute user={currentUser} />}>
                         <Route path="/dashboard" element={currentUser && <DashboardScreen user={currentUser} onNavigate={handleNavigate} />} />
                         <Route path="/document-library" element={<DocumentLibraryScreen onNavigate={handleNavigate} />} />
                         <Route path="/account/:accountId" element={currentUser && <AccountDetailsWrapper user={currentUser} />} />
-                        <Route path="/transfer" element={currentUser && <TransferScreen user={currentUser} onTransfer={handleTransfer} onNavigate={handleNavigate} />} />
+                        <Route path="/transfer" element={currentUser && <TransferScreen user={currentUser} onTransfer={handleTransfer} onPayeeTransfer={handlePayeeTransfer} onNavigate={handleNavigate} />} />
+                        <Route path="/payees" element={currentUser && <PayeesScreen payees={currentUser.payees} onNavigate={handleNavigate} onAddPayee={handleAddPayee} onDeletePayee={handleDeletePayee} />} />
                         <Route path="/deposit" element={currentUser && <DepositScreen user={currentUser} onNavigate={handleNavigate} onDeposit={handleDeposit} />} />
                         <Route path="/loans" element={<LoansScreen onNavigate={handleNavigate} />} />
+                        <Route path="/loan-decision/:loanId" element={currentUser && <CreditDecisionWrapper user={currentUser} />} />
+                        <Route path="/disburse/:loanId" element={currentUser && <DisbursementWrapper user={currentUser} onDisburse={handleDisburseLoan} />} />
                         <Route path="/contact" element={<ContactScreen onNavigate={handleNavigate} />} />
                         <Route path="/security/:action" element={currentUser && <SecurityScreenWrapper user={currentUser} onActionComplete={handleSecurityAction} />} />
                         <Route path="/apply/:accountType" element={currentUser && <ApplicationScreenWrapper user={currentUser} onSubmit={handleApplicationSubmit} />} />
