@@ -18,15 +18,20 @@ const LoanApplicationScreen: React.FC<LoanApplicationScreenProps> = ({ loanType,
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [ekycError, setEkycError] = useState('');
+    const [stepError, setStepError] = useState('');
     const [formData, setFormData] = useState<Partial<LoanApplicationData>>({
         firstName: '', lastName: '', dob: '', address: '', city: '', state: STATES[0], zip: '',
-        employer: '', jobTitle: '', annualIncome: 0, loanAmount: 0, loanTerm: 12, purpose: '',
+        employer: '', jobTitle: '', annualIncome: undefined, loanAmount: undefined, loanTerm: 12, purpose: '',
         idType: ID_TYPES[0], idNumber: '', idFrontUploaded: false, idBackUploaded: false, livenessVerified: false,
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: (e.target.type === 'number') ? parseFloat(value) : value }));
+        if (e.target.type === 'number') {
+            setFormData(prev => ({ ...prev, [name]: value === '' ? undefined : parseFloat(value) }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleNext = () => {
@@ -34,13 +39,26 @@ const LoanApplicationScreen: React.FC<LoanApplicationScreenProps> = ({ loanType,
             setEkycError('Please complete document upload and the liveness check before continuing.');
             return;
         }
+        if (step === 3 && (!formData.annualIncome || formData.annualIncome <= 0)) {
+            setStepError('Please enter your annual income before continuing.');
+            return;
+        }
         setEkycError('');
+        setStepError('');
         setStep(s => s + 1);
     };
-    const handleBack = () => setStep(s => s - 1);
+    const handleBack = () => {
+        setStepError('');
+        setStep(s => s - 1);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!formData.loanAmount || formData.loanAmount <= 0) {
+            setStepError('Please enter the amount you\u2019d like to borrow before submitting.');
+            return;
+        }
+        setStepError('');
         setLoading(true);
         setTimeout(async () => {
             await onSubmit(formData as LoanApplicationData, loanType);
@@ -128,10 +146,15 @@ const LoanApplicationScreen: React.FC<LoanApplicationScreenProps> = ({ loanType,
                             <h3 className="text-2xl font-black text-white tracking-tight">Capital & Employment</h3>
                             <p className="text-slate-500 text-sm font-medium">Verify your income sources for risk assessment.</p>
                         </div>
+                        {stepError && (
+                            <div id="income_error" className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-[10px] font-black uppercase text-center">
+                                {stepError}
+                            </div>
+                        )}
                         <div className="space-y-6">
                             <Input id="employer" name="employer" label="Current Employer" value={formData.employer} onChange={handleChange} required />
                             <Input id="jobTitle" name="jobTitle" label="Job Title" value={formData.jobTitle} onChange={handleChange} required />
-                            <Input id="annualIncome" name="annualIncome" label="Annual Income ($)" type="number" value={formData.annualIncome} onChange={handleChange} required />
+                            <Input id="annualIncome" name="annualIncome" label="Annual Income ($)" type="number" min="0" placeholder="0.00" value={formData.annualIncome ?? ''} onChange={handleChange} required />
                         </div>
                     </div>
                 );
@@ -142,8 +165,13 @@ const LoanApplicationScreen: React.FC<LoanApplicationScreenProps> = ({ loanType,
                             <h3 className="text-2xl font-black text-white tracking-tight">Facility Requirements</h3>
                             <p className="text-slate-500 text-sm font-medium">Define repayment and utilization parameters.</p>
                         </div>
+                        {stepError && (
+                            <div id="facility_error" className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-[10px] font-black uppercase text-center">
+                                {stepError}
+                            </div>
+                        )}
                         <div className="space-y-6">
-                            <Input id="loanAmount" name="loanAmount" label="Required Amount ($)" type="number" value={formData.loanAmount} onChange={handleChange} required />
+                            <Input id="loanAmount" name="loanAmount" label="Required Amount ($)" type="number" min="0.01" placeholder="0.00" value={formData.loanAmount ?? ''} onChange={handleChange} required />
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Proposed Term</label>
                                 <select name="loanTerm" id="loanTerm" value={formData.loanTerm} onChange={handleChange} className="w-full bg-slate-950 border border-white/5 rounded-2xl p-4 text-white text-sm font-medium outline-none">
