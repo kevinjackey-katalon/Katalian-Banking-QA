@@ -1,4 +1,3 @@
-
 import { User, Transaction } from './types';
 
 const generateMockTransactions = (count: number, baseDescription: string): Transaction[] => {
@@ -61,6 +60,26 @@ export const USERS: User[] = [
       },
     ],
     loans: [],
+    payees: [
+      {
+        id: 'payee-1001',
+        name: 'Alex Rivera',
+        nickname: 'Roommate - Rent Split',
+        bankName: 'First Continental Bank',
+        accountNumber: '...4471',
+        routingNumber: '021000021',
+        addedDate: '2025-02-14T00:00:00Z',
+      },
+      {
+        id: 'payee-1002',
+        name: 'Katalian Power & Utilities',
+        nickname: 'Electric Bill',
+        bankName: 'Metro Regional Bank',
+        accountNumber: '...8820',
+        routingNumber: '011401533',
+        addedDate: '2025-03-02T00:00:00Z',
+      },
+    ],
   },
   {
     id: 'user4',
@@ -79,6 +98,7 @@ export const USERS: User[] = [
       },
     ],
     loans: [],
+    payees: [],
   },
 ];
 
@@ -97,3 +117,6 @@ export const LOAN_PRODUCTS = [
     { type: 'Auto', rate: '4.25%', description: 'Get behind the wheel of your dream car faster.', icon: '🚗' },
     { type: 'Mortgage', rate: '6.45%', description: 'Your journey to home ownership starts here.', icon: '🏠' },
 ];
+
+export const ID_TYPES: LoanApplicationIdType[] = ['Passport', 'Driver License', 'National ID'];
+export type LoanApplicationIdType = 'Passport' | 'Driver License' | 'National ID';
