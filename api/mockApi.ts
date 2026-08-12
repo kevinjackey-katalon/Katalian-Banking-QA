@@ -92,7 +92,7 @@ export const mockApi = {
         return { success: true };
     },
 
-    // --- Lending: application -> eKYC (validated client-side) -> credit decision -> disbursement ---
+    // --- Lending: application -> eKYC (validated client-side) -> credit decision -> disbursement -> repayment ---
 
     async submitLoanApplication(_userId: string, loanData: LoanApplicationData, type: Loan['type']): Promise<Loan> {
         await delay(2000);
@@ -116,5 +116,10 @@ export const mockApi = {
     async disburseLoan(_loanId: string, _toAccountId: string): Promise<{ success: boolean; disbursedDate: string }> {
         await delay(1500);
         return { success: true, disbursedDate: new Date().toISOString() };
+    },
+
+    async repayLoan(_loanId: string, _fromAccountId: string, _amount: number): Promise<{ success: boolean; repaidDate: string }> {
+        await delay(1200);
+        return { success: true, repaidDate: new Date().toISOString() };
     },
 };

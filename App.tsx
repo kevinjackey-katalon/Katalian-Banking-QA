@@ -30,18 +30,25 @@ const STORAGE_KEYS = {
 };
 
 /**
- * Records saved to localStorage before the Payees feature existed (or any future
- * schema addition) won't have every field on the current `User` shape. Loading
- * that raw JSON back in leaves `payees`/`loans` as `undefined`, which crashes any
- * screen that calls .map/.find/.length on them (e.g. Manage Payees rendering
- * blank). Normalize on every load so the app is always working with a
- * well-formed User, and that well-formed shape is what gets persisted going
- * forward.
+ * Records saved to localStorage before certain fields existed (Payees, loan
+ * repayment tracking, etc.) won't have every field on the current shape.
+ * Loading that raw JSON back in leaves those fields `undefined`, which
+ * crashes any screen that calls .map/.find/.length on them (e.g. Manage
+ * Payees rendering blank). Normalize on every load so the app is always
+ * working with a well-formed User/Loan, and that well-formed shape is what
+ * gets persisted going forward.
  */
+const normalizeLoan = (loan: Loan): Loan => ({
+    ...loan,
+    // Loans disbursed before `outstandingBalance` existed are assumed to still owe
+    // the full original principal (we have no repayment history to reconstruct).
+    outstandingBalance: loan.outstandingBalance ?? (loan.status === 'Active' ? loan.amount : 0),
+});
+
 const normalizeUser = (user: User): User => ({
     ...user,
     payees: user.payees ?? [],
-    loans: user.loans ?? [],
+    loans: (user.loans ?? []).map(normalizeLoan),
 });
 
 const ApplicationScreenWrapper: React.FC<{
@@ -291,9 +298,46 @@ const App: React.FC = () => {
         );
         const updatedLoans = currentUser.loans.map(l =>
             l.id === loanId
-                ? { ...l, status: 'Active' as const, disbursed: true, disbursedToAccountId: toAccountId, disbursedDate: result.disbursedDate }
+                ? { ...l, status: 'Active' as const, disbursed: true, disbursedToAccountId: toAccountId, disbursedDate: result.disbursedDate, outstandingBalance: l.amount }
                 : l
         );
+        const updatedUser = { ...currentUser, accounts: updatedAccounts, loans: updatedLoans };
+        setCurrentUser(updatedUser);
+        setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
+    };
+
+    // Repay an active loan from a deposit account. Validation (amount vs. outstanding
+    // balance, amount vs. account balance) happens in LoansScreen before this is called.
+    const handleRepayLoan = async (loanId: string, fromAccountId: string, amount: number) => {
+        if (!currentUser) return;
+        const loan = currentUser.loans.find(l => l.id === loanId);
+        if (!loan) return;
+
+        const result = await mockApi.repayLoan(loanId, fromAccountId, amount);
+
+        const repaymentTx: Transaction = {
+            id: `tx-${Math.random().toString(36).substr(2, 9)}`,
+            date: result.repaidDate,
+            description: `${loan.type} Loan Repayment`,
+            amount,
+            type: 'Debit',
+            category: 'Loan Repayment',
+        };
+
+        const outstanding = loan.outstandingBalance ?? loan.amount;
+        const remainingBalance = Math.max(0, Math.round((outstanding - amount) * 100) / 100);
+
+        const updatedAccounts = currentUser.accounts.map(acc =>
+            acc.id === fromAccountId
+                ? { ...acc, balance: acc.balance - amount, transactions: [repaymentTx, ...acc.transactions] }
+                : acc
+        );
+        const updatedLoans = currentUser.loans.map(l =>
+            l.id === loanId
+                ? { ...l, outstandingBalance: remainingBalance, status: remainingBalance <= 0 ? 'Paid Off' as const : l.status }
+                : l
+        );
+
         const updatedUser = { ...currentUser, accounts: updatedAccounts, loans: updatedLoans };
         setCurrentUser(updatedUser);
         setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
@@ -403,7 +447,7 @@ const App: React.FC = () => {
                         <Route path="/transfer" element={currentUser && <TransferScreen user={currentUser} onTransfer={handleTransfer} onPayeeTransfer={handlePayeeTransfer} onNavigate={handleNavigate} />} />
                         <Route path="/payees" element={currentUser && <PayeesScreen payees={currentUser.payees} onNavigate={handleNavigate} onAddPayee={handleAddPayee} onDeletePayee={handleDeletePayee} />} />
                         <Route path="/deposit" element={currentUser && <DepositScreen user={currentUser} onNavigate={handleNavigate} onDeposit={handleDeposit} />} />
-                        <Route path="/loans" element={<LoansScreen onNavigate={handleNavigate} />} />
+                        <Route path="/loans" element={currentUser && <LoansScreen user={currentUser} onNavigate={handleNavigate} onRepayLoan={handleRepayLoan} />} />
                         <Route path="/loan-decision/:loanId" element={currentUser && <CreditDecisionWrapper user={currentUser} />} />
                         <Route path="/disburse/:loanId" element={currentUser && <DisbursementWrapper user={currentUser} onDisburse={handleDisburseLoan} />} />
                         <Route path="/contact" element={<ContactScreen onNavigate={handleNavigate} />} />

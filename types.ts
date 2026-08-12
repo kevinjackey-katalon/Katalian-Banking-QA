@@ -47,7 +47,7 @@ export interface Loan {
   type: 'Personal' | 'Auto' | 'Mortgage';
   amount: number;
   interestRate: number;
-  status: 'Pending' | 'Approved' | 'Referred' | 'Declined' | 'Active';
+  status: 'Pending' | 'Approved' | 'Referred' | 'Declined' | 'Active' | 'Paid Off';
   termMonths: number;
   /** Result of the automated credit decision engine, and the human-readable rationale shown to the applicant. */
   decision?: CreditDecisionOutcome;
@@ -58,6 +58,8 @@ export interface Loan {
   disbursed?: boolean;
   disbursedToAccountId?: string;
   disbursedDate?: string;
+  /** Remaining principal owed. Set to `amount` at disbursement and reduced by each repayment; 0 once "Paid Off". */
+  outstandingBalance?: number;
 }
 
 export type ViewType =
