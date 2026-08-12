@@ -86,7 +86,6 @@ const TwoFactorScreen: React.FC<TwoFactorScreenProps> = ({ userId, username, onV
                         <Input
                             label="Verification Code"
                             id="otp_code"
-                            data-testid="otp_code"
                             inputMode="numeric"
                             maxLength={6}
                             placeholder="000000"
@@ -133,7 +132,7 @@ const TwoFactorScreen: React.FC<TwoFactorScreenProps> = ({ userId, username, onV
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-3xl p-6 text-center space-y-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-400">Demo Mode — No SMS Gateway Connected</p>
                     <p className="text-[11px] text-slate-400 font-medium">Your one-time code (visible here so QA and teammates don't need a real phone):</p>
-                    <p id="demo_otp_code" data-testid="demo_otp_code" className="text-3xl font-black text-white tracking-[0.4em] tabular-nums">{otpCode}</p>
+                    <p id="demo_otp_code" className="text-3xl font-black text-white tracking-[0.4em] tabular-nums">{otpCode}</p>
                 </div>
 
                 <p className="text-center text-[10px] text-slate-700 uppercase font-black tracking-[0.4em]">Protected by AES-256</p>
