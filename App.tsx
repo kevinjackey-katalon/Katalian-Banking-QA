@@ -132,31 +132,31 @@ const DisbursementWrapper: React.FC<{
 }
 
 const App: React.FC = () => {
-    // Initialize state from localStorage
+    // Account/transaction data persists across visits (localStorage).
     const [users, setUsers] = useState<User[]>(() => {
         const saved = localStorage.getItem(STORAGE_KEYS.USERS);
         return saved ? JSON.parse(saved) : USERS;
     });
+    // The logged-in session itself does NOT persist across visits: sessionStorage is
+    // cleared when the browser tab/window closes, so a fresh visit always requires login.
     const [currentUser, setCurrentUser] = useState<User | null>(() => {
-        const saved = localStorage.getItem(STORAGE_KEYS.SESSION);
+        const saved = sessionStorage.getItem(STORAGE_KEYS.SESSION);
         return saved ? JSON.parse(saved) : null;
     });
-    // A user who has passed password authentication but has not yet completed the 2FA challenge.
     const [pendingUser, setPendingUser] = useState<User | null>(null);
     
     const navigate = useNavigate();
 
-    // Persist users list on change
     useEffect(() => {
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     }, [users]);
 
-    // Persist session on change
+    // Persist session on change (sessionStorage only -- see note above)
     useEffect(() => {
         if (currentUser) {
-            localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(currentUser));
+            sessionStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(currentUser));
         } else {
-            localStorage.removeItem(STORAGE_KEYS.SESSION);
+            sessionStorage.removeItem(STORAGE_KEYS.SESSION);
         }
     }, [currentUser]);
 
@@ -188,7 +188,6 @@ const App: React.FC = () => {
         if (user.passwordHash !== password) return 'invalid';
 
         if (isDeviceTrusted(user.id)) {
-            // Device previously completed 2FA and was marked as trusted — skip the OTP challenge.
             setCurrentUser(user);
             navigate('/dashboard');
         } else {
@@ -245,7 +244,6 @@ const App: React.FC = () => {
         navigate('/dashboard');
     };
 
-    // Lending: application -> eKYC (validated in the wizard) -> credit decision -> disbursement
     const handleLoanSubmit = async (loanData: LoanApplicationData, type: Loan['type']) => {
         if (!currentUser) return;
         const newLoan = await mockApi.submitLoanApplication(currentUser.id, loanData, type);
