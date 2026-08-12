@@ -27,10 +27,21 @@ const LoanApplicationScreen: React.FC<LoanApplicationScreenProps> = ({ loanType,
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
+        if (name === 'loanAmount') {
+            // Whole-dollar amounts only -- truncate any decimal portion instead of rejecting the input outright.
+            setFormData(prev => ({ ...prev, loanAmount: value === '' ? undefined : parseInt(value, 10) }));
+            return;
+        }
         if (e.target.type === 'number') {
             setFormData(prev => ({ ...prev, [name]: value === '' ? undefined : parseFloat(value) }));
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
+        }
+    };
+
+    const blockDecimalInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) {
+            e.preventDefault();
         }
     };
 
@@ -171,7 +182,7 @@ const LoanApplicationScreen: React.FC<LoanApplicationScreenProps> = ({ loanType,
                             </div>
                         )}
                         <div className="space-y-6">
-                            <Input id="loanAmount" name="loanAmount" label="Required Amount ($)" type="number" min="0.01" placeholder="0.00" value={formData.loanAmount ?? ''} onChange={handleChange} required />
+                            <Input id="loanAmount" name="loanAmount" label="Required Amount ($)" type="number" min="1" step="1" placeholder="0" value={formData.loanAmount ?? ''} onChange={handleChange} onKeyDown={blockDecimalInput} required />
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Proposed Term</label>
                                 <select name="loanTerm" id="loanTerm" value={formData.loanTerm} onChange={handleChange} className="w-full bg-slate-950 border border-white/5 rounded-2xl p-4 text-white text-sm font-medium outline-none">
