@@ -29,6 +29,21 @@ const STORAGE_KEYS = {
     SESSION: 'katalian_session_v1'
 };
 
+/**
+ * Records saved to localStorage before the Payees feature existed (or any future
+ * schema addition) won't have every field on the current `User` shape. Loading
+ * that raw JSON back in leaves `payees`/`loans` as `undefined`, which crashes any
+ * screen that calls .map/.find/.length on them (e.g. Manage Payees rendering
+ * blank). Normalize on every load so the app is always working with a
+ * well-formed User, and that well-formed shape is what gets persisted going
+ * forward.
+ */
+const normalizeUser = (user: User): User => ({
+    ...user,
+    payees: user.payees ?? [],
+    loans: user.loans ?? [],
+});
+
 const ApplicationScreenWrapper: React.FC<{
     user: User, 
     onSubmit: (appData: ApplicationData, accountType: Account['type']) => void
@@ -135,13 +150,14 @@ const App: React.FC = () => {
     // Account/transaction data persists across visits (localStorage).
     const [users, setUsers] = useState<User[]>(() => {
         const saved = localStorage.getItem(STORAGE_KEYS.USERS);
-        return saved ? JSON.parse(saved) : USERS;
+        const parsed: User[] = saved ? JSON.parse(saved) : USERS;
+        return parsed.map(normalizeUser);
     });
     // The logged-in session itself does NOT persist across visits: sessionStorage is
     // cleared when the browser tab/window closes, so a fresh visit always requires login.
     const [currentUser, setCurrentUser] = useState<User | null>(() => {
         const saved = sessionStorage.getItem(STORAGE_KEYS.SESSION);
-        return saved ? JSON.parse(saved) : null;
+        return saved ? normalizeUser(JSON.parse(saved)) : null;
     });
     const [pendingUser, setPendingUser] = useState<User | null>(null);
     
