@@ -29,7 +29,7 @@ const generateSixDigitCode = (): string => {
     return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-export const generateAndStoreOtp = (userId: string): StoredOtp {
+export const generateAndStoreOtp = (userId: string): StoredOtp => {
     const otp: StoredOtp = {
         code: generateSixDigitCode(),
         userId,
